@@ -1,20 +1,22 @@
 # README
 
 # Contents
+
 - Introduction
 - Prerequisites
-- Installing and configuring the module
+- Installing the payment module
 - License
 
 # Introduction
 
 This Woo-Commerce module provides an easy method to integrate with the payment gateway.
  - The woocommerce-latest directory contains the files that need to be uploaded to the wp-content/plugins/ directory
+ - Supports WooCommerce versions: **3.2 - 4.7**
 
 # Prerequisites
 
 - The module requires the following prerequisites to be met in order to function correctly:
-    - Woo-commerce Wordpress extension v3.2+
+    - Woo-commerce Wordpress extension
     - The 'bcmath' php extension module: https://www.php.net/manual/en/book.bc.php
     - SSL **NB: HTTPS is expected to be in place as the payment gateway will respond over SSL when redirecting the user's browser. Failure to provide an environment where HTTPS traffic is possible, will result in the 3DSv2 payment flow failing***
 
@@ -22,12 +24,14 @@ This Woo-Commerce module provides an easy method to integrate with the payment g
 
 # Installing and configuring the module
 
-1. Unzip and upload the plugin folder to your /wp-content/plugins/ directory
+1. Unzip and upload the plugin folder to your /wp-content/plugins/ directory or navigate to Plugins -> add new plugin -> upload plugin and then drop the zip file where specified
 2. Activate the plugin through the Plugins menu in WordPress
 3. Go to WooCommerce -> Plugins -> Payment-Network and click on the settings button.
 4. Enter your MerchantID / Secretkey and update the customer/country code.
-5. Set the Enabled option to true.
-6. Click 'Save Changes'.
+5. If you own a custom form on your gateway, enter the full URL to it in the custom form box (Including trailing /).
+6. Selects what type of integration you would like to use.
+7. Set the Enabled option to true.
+8. Click 'Save Changes'.
 
 License
 ----
