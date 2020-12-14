@@ -217,7 +217,9 @@ class WC_Payment_Network extends WC_Payment_Gateway {
      */
     public function capture_order($order_id) {
         $order     = new WC_Order($order_id);
-        $amount    = (int) round($order->get_total(), 2) * 100;
+        // $amount    = (int) round($order->get_total(), 2) * 100;
+	$amount    = intval(bcmul(round($order->get_total(), 2), 100, 0));
+	    
 
         $billing_address  = $order->get_billing_address_1();
         $billing2 = $order->get_billing_address_2();
