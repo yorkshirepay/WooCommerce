@@ -12,6 +12,7 @@
 This Woo-Commerce module provides an easy method to integrate with the payment gateway.
  - The woocommerce-latest directory contains the files that need to be uploaded to the wp-content/plugins/ directory
  - Supports WooCommerce versions: **3.2 - 4.7**
+ - Supports Recurring payments using WooCommerce subscriptions plugin found here: https://woocommerce.com/products/woocommerce-subscriptions/?utm_source=google&utm_medium=search&utm_campaign=marketplace_search_brand_row&utm_content=+woocommerce_+subscriptions&gclid=CjwKCAiA9bmABhBbEiwASb35V6LBxRec_Gx8zRBjbVNg_iDUE91R4I1wlS0Sd7RjZ--DbOBW_sNIRBoCflkQAvD_BwE#
 
 # Prerequisites
 
