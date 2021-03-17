@@ -25,7 +25,7 @@ class WC_Payment_Network extends WC_Payment_Gateway {
 
         $this->has_fields          = false;
         $this->id                  = $id;
-        $this->icon                = plugins_url('/', dirname(__FILE__)) . 'img/logo.png';
+        $this->icon                = plugins_url('/', dirname(__FILE__)) . 'assets/img/logo.png';
         $this->method_title        = __(ucwords($this->gateway), self::$lang);
         $this->method_description  = __(ucwords($this->gateway) . ' hosted works by sending the user to ' . ucwords($this->gateway) . ' to enter their payment infomation', self::$lang);
         $this->supports = array (
@@ -90,6 +90,8 @@ class WC_Payment_Network extends WC_Payment_Gateway {
         }
 
         // Hooks
+        add_action( 'wp_enqueue_scripts', array( $this, 'payment_scripts' ) );
+
         /* 1.6.6 */
         add_action('woocommerce_update_options_payment_gateways', array($this, 'process_admin_options'));
 
@@ -167,7 +169,7 @@ class WC_Payment_Network extends WC_Payment_Gateway {
             'gatewayURL' => array(
                 'title'       => __('Gateway URL', self::$lang),
                 'type'        => 'text',
-                'description' => __('Allows the use of custom forms. Leave blank to use default', self::$lang)
+                'description' => __('Overrides the gateway URL. Leave blank to use default', self::$lang)
             ),
             'countryCode' => array(
                 'title'       => __('Country Code', self::$lang),
@@ -200,15 +202,34 @@ class WC_Payment_Network extends WC_Payment_Gateway {
             echo wpautop( wp_kses_post( $this->description ) );
         }
 
-        switch ($this->settings['type']) {
-            case 'direct':
-                echo $this->generate_direct_initial_request_form_v1();
-                break;
-            case 'direct_v2':
-                echo $this->generate_direct_initial_request_form_v2();
-                break;
-            default;
+        if (in_array($this->settings['type'], ['direct', 'direct_v2'])) {
+            echo $this->generate_direct_initial_request_form();
+
+            wp_enqueue_style('gateway-credit-card-styles', plugins_url('assets/css/gateway.css', dirname(__FILE__)));
         }
+    }
+
+    public function validate_fields() {
+        if (in_array($this->settings['type'], ['direct', 'direct_v2'])) {
+            $result = WC_Credit_Card_Validator::validCreditCard($_POST['cardNumber']);
+
+            if (!$result['valid']) {
+                wc_add_notice(  'Not a valid Card Number. Please check the card details.', 'error' );
+                return false;
+            }
+
+            if (!WC_Credit_Card_Validator::validDate('20'.$_POST['cardExpiryYear'], $_POST['cardExpiryMonth'])) {
+                wc_add_notice(  'Not a valid Expiry Date. Please check the card details.', 'error' );
+                return false;
+            }
+
+            if (!WC_Credit_Card_Validator::validCvc($_POST['cardCVV'], $result['type'])) {
+                wc_add_notice(  'Not a valid Card CVV. Please check the card details.', 'error' );
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -216,9 +237,9 @@ class WC_Payment_Network extends WC_Payment_Gateway {
      * @return array
      */
     public function capture_order($order_id) {
-        $order = new WC_Order($order_id);
-	$amount = (int) (round($order->get_total(), 2) * 100);
-	    
+        $order     = new WC_Order($order_id);
+        // $amount    = (int) round($order->get_total(), 2) * 100;
+        $amount    = intval(bcmul(round($order->get_total(), 2), 100, 0));
 
         $billing_address  = $order->get_billing_address_1();
         $billing2 = $order->get_billing_address_2();
@@ -321,7 +342,7 @@ class WC_Payment_Network extends WC_Payment_Gateway {
                 $_POST['browserInfo'],
                 [
                     'type'                 => 1,
-                    'cardNumber'           => $_POST['cardNumber'],
+                    'cardNumber'           => str_replace(' ', '', $_POST['cardNumber']),
                     'cardExpiryMonth'      => $_POST['cardExpiryMonth'],
                     'cardExpiryYear'       => $_POST['cardExpiryYear'],
                     'cardCVV'              => $_POST['cardCVV'],
@@ -374,7 +395,7 @@ class WC_Payment_Network extends WC_Payment_Gateway {
         if ('direct' === $this->settings['type']) {
             $args = array_merge($this->capture_order($order_id), [
                 'type'              => 1,
-                'cardNumber'        => $_POST['cardNumber'],
+                'cardNumber'        => str_replace(' ', '', $_POST['cardNumber']),
                 'cardExpiryMonth'   => $_POST['cardExpiryMonth'],
                 'cardExpiryYear'    => $_POST['cardExpiryYear'],
                 'cardCVV'           => $_POST['cardCVV'],
@@ -530,7 +551,7 @@ FORM;
      * Direct form step 1
      * @return string
      */
-    protected function generate_direct_initial_request_form_v2() {
+    protected function generate_direct_initial_request_form() {
         $parameters = [
             'cardNumber'         => @$_POST['cardNumber'],
             'cardExpiryMonth'    => @$_POST['cardExpiryMonth'],
@@ -576,104 +597,78 @@ FORM;
 SCRIPT;
         }
 
-        return <<<FORM
-    <label class="card-label label-cardNumber">Card Number</label>
-    <input type='text' class='card-input field-cardNumber' name='cardNumber' value='{$parameters['cardNumber']}' required='required'/>
-
-    <div style="display:flex; place-content: center space-between; align-items: center;">
-        <div style="width: 35%">
-            <label class="card-label label-cardExpiryMonth">Card Expiry Date</label>
-            <div style="display: flex; place-content: center space-between;">
-                <input type='text' style="width: 45%" class='card-input field-cardExpiryMonth' name='cardExpiryMonth' value='{$parameters['cardExpiryMonth']}' required='required' placeholder='MM' maxlength='2'/>
-                <input type='text' style="width: 45%" class='card-input field-cardExpiryYear' name='cardExpiryYear' value='{$parameters['cardExpiryYear']}' required='required' placeholder='YY' maxlength='4'/>
-            </div>
-        </div>
-        <div style="width: 40%">
-    <label class="card-label label-cardCVV">CVV</label>
-    <input type='text' class='card-input field-cardCVV' name='cardCVV' value='{$parameters['cardCVV']}' required='required'/>
-</div>
-    </div>
-    <br/>
-    {$browserInfo}
-    {$scriptData}
-FORM;
-    }
-
-    /**
-     * Direct form step 1
-     * @param $order_id
-     * @param array $errors
-     * @return string
-     */
-    protected function generate_direct_initial_request_form_v1() {
-        $parameters = [
-            'cardNumber'         => @$_POST['cardNumber'],
-            'cardExpiryMonth'    => @$_POST['cardExpiryMonth'],
-            'cardExpiryYear'     => @$_POST['cardExpiryYear'],
-            'cardCVV'            => @$_POST['cardCVV'],
-        ];
-
-        $browserInfo = '';
-        $scriptData = '';
-
-        if (in_array($this->settings['type'], ['direct_v2'], true)) {
-            $deviceData = [
-                'browserAcceptHeader'      => (isset($_SERVER['HTTP_ACCEPT']) ? htmlentities($_SERVER['HTTP_ACCEPT']) : null),
-                'browserIPAddress'         => (isset($_SERVER['REMOTE_ADDR']) ? htmlentities($_SERVER['REMOTE_ADDR']) : null),
-                'browserJavaEnabledVal'    => '',
-                'browserJavaScriptEnabled' => true,
-                'browserLanguage'		   => (isset($_SERVER['HTTP_ACCEPT_LANGUAGE']) ? htmlentities($_SERVER['HTTP_ACCEPT_LANGUAGE']) : null),
-                'browserScreenColorDepth'  => '',
-                'browserScreenHeight'      => '',
-                'browserScreenWidth'       => '',
-                'browserTimeZone'          => '0',
-                'browserUserAgent'		   => (isset($_SERVER['HTTP_USER_AGENT']) ? htmlentities($_SERVER['HTTP_USER_AGENT']) : null),
-            ];
-
-            foreach ($deviceData as $key => $value) {
-                $browserInfo .= '<input type="hidden" id="'.$key.'" name="threeDSOptions[' . $key .']" value="' . htmlentities($value) . '" />';
+        $generateMonthOptions = function () use ($parameters) {
+            $str = '';
+            foreach (range(1, 12) as $value) {
+                $s = $parameters['cardExpiryMonth'] == $value ? 'selected' : '';
+                $str .= '<option value="'.str_pad($value, 2, '0', STR_PAD_LEFT).'"'.$s.'>'.$value.'</option>'."\n";
             }
 
-            $scriptData = <<<SCRIPT
-<script>
-    const screen_width = (window && window.screen ? window.screen.width : '0');
-    const screen_height = (window && window.screen ? window.screen.height : '0');
-    const screen_depth = (window && window.screen ? window.screen.colorDepth : '0');
-    const identity = (window && window.navigator ? window.navigator.userAgent : '');
-    const language = (window && window.navigator ? (window.navigator.language ? window.navigator.language : window.navigator.browserLanguage) : '');
-    const timezone = (new Date()).getTimezoneOffset();
-    const java = (window && window.navigator ? navigator.javaEnabled() : false);
-    document.getElementById('browserUserAgent').value = identity;
-    document.getElementById('browserTimeZone').value = timezone;
-    document.getElementById('browserJavaEnabledVal').value = java;
-    document.getElementById('browserLanguage').value = language;
-    document.getElementById('browserScreenColorDepth').value = screen_depth;
-    document.getElementById('browserScreenWidth').value = screen_width;
-    document.getElementById('browserScreenHeight').value = screen_height;
-</script>
-SCRIPT;
-        }
+            return $str;
+        };
+
+        $generateYearOptions = function () use ($parameters) {
+            $str = '';
+            foreach (range(date("Y"), date("Y") + 12) as $value) {
+                $s = $parameters['cardExpiryYear'] == $value ? 'selected' : '';
+                $str .= '<option value="'.substr($value, 2).'"'.$s.'>'.$value.'</option>'."\n";
+            }
+
+            return $str;
+        };
 
         return <<<FORM
-    <label class="card-label label-cardNumber">Card Number</label>
-    <input type='text' class='card-input field-cardNumber' name='cardNumber' value='{$parameters['cardNumber']}' required='required'/>
-
-    <div style="display:flex; place-content: center space-between; align-items: center;">
-        <div style="width: 35%">
-            <label class="card-label label-cardExpiryMonth">Card Expiry Date</label>
-            <div style="display: flex; place-content: center space-between;">
-                <input type='text' style="width: 45%" class='card-input field-cardExpiryMonth' name='cardExpiryMonth' value='{$parameters['cardExpiryMonth']}' required='required' placeholder='MM' maxlength='2'/>
-                <input type='text' style="width: 45%" class='card-input field-cardExpiryYear' name='cardExpiryYear' value='{$parameters['cardExpiryYear']}' required='required' placeholder='YY' maxlength='4'/>
-            </div>
-        </div>
-        <div style="width: 40%">
-    <label class="card-label label-cardCVV">CVV</label>
-    <input type='text' class='card-input field-cardCVV' name='cardCVV' value='{$parameters['cardCVV']}' required='required'/>
+<div style="display:flex; flex-direction:column; margin-bottom: 1vh;">
+    <label>Card Number</label>
+    <input type='text' id="field-cardNumber" name="cardNumber" value='{$parameters['cardNumber']}' maxlength="23" required='required'/>
 </div>
+<div style="display:flex; place-content:center space-between;">
+    <div style="flex-direction: column; width: 45%; display: flex;">
+        <label>Card Expiry Date</label>
+        <div>
+            <select style="width: 45%;" id="field-cardExpiryMonth" name="cardExpiryMonth" required='required'>
+                <option value="" disabled selected>Month</option>
+                {$generateMonthOptions()}
+            </select>
+            <select style="width: 45%;" id="field-cardExpiryYear" name="cardExpiryYear" required='required'>
+                <option value="" disabled selected>Year</option>
+                {$generateYearOptions()}
+            </select>
+        </div>
     </div>
-    <br/>
-    {$browserInfo}
-    {$scriptData}
+    <div style="width: 40%; flex-direction: column; display: flex;">
+        <label>CVV</label>
+        <input type="text" id="field-cardCVV" name="cardCVV" value="{$parameters['cardCVV']}" maxlength="4" required="required"/>
+    </div>
+</div>
+<br/>
+{$browserInfo}
+{$scriptData}
+<script type="text/javascript">
+var cardNumber = document.getElementById('field-cardNumber');
+
+payform.cardNumberInput(cardNumber);
+cardNumber.addEventListener('change', e => {
+    e.target.style.borderColor = payform.validateCardNumber(e.target.value) ? '#B0B0B0' : 'red';     
+});
+
+document.getElementById('field-cardCVV').addEventListener('change', e => {
+    e.target.style.borderColor = payform.validateCardCVC(e.target.value) ? '#B0B0B0' : 'red';     
+});
+
+var cardExpiryMonthElement = document.getElementById('field-cardExpiryMonth');
+var cardExpiryYearElement = document.getElementById('field-cardExpiryYear');
+
+var listener = e => {
+    let isValid = payform.validateCardExpiry(cardExpiryMonthElement.value, '20'+cardExpiryYearElement.value);
+    
+    cardExpiryMonthElement.style.borderColor =  isValid ? '#B0B0B0' : 'red';     
+    cardExpiryYearElement.style.borderColor = isValid ? '#B0B0B0' : 'red';     
+};
+
+cardExpiryMonthElement.addEventListener('change', listener);
+cardExpiryYearElement.addEventListener('change', listener);
+</script>
 FORM;
     }
 
@@ -727,7 +722,7 @@ FORM;
         }
 
         if (isset($response['responseCode'])) {
-            if ($order->get_status == 'completed') {
+            if ($order->get_status() == 'completed') {
                 return [
                     'result' => 'error',
                     'redirect' => $this->get_return_url($order),
@@ -754,6 +749,10 @@ FORM;
                     if (method_exists($woocommerce, 'add_error')) {
                         $woocommerce->add_error($message);
                     } else {
+                        if (in_array($response['responseCode'], [66315, 66316, 66316, 66320])) {
+                            $message = 'Double check to make sure that you entered your Credit Card number, CVV2 code, and Expiration Date correctly.';
+                        }
+
                         wc_add_notice($message, $notice_type = 'error');
                     }
                     $order->update_status('failed');
@@ -796,14 +795,14 @@ FORM;
         $req = array(
             'merchantID' => $this->settings['merchantID'],
             'xref' => $xref,
-            'amount' => (int) round($amount_to_charge, 2) * 100,
+            'amount' => intval(bcmul(round($amount_to_charge, 2), 100, 0)),
             'action' => "SALE",
             'type' => 9,
         );
 
         // Sign and send request
         $req['signature'] = $this->create_signature($req,$this->settings['signature']);
-        $ch = curl_init($this->gateway_url);
+        $ch = curl_init(self::DEFAULT_DIRECT_URL);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($req));
         curl_setopt($ch, CURLOPT_HEADER, false);
@@ -921,6 +920,23 @@ HTML;
         $this->redirect($data['redirect']);
     }
 
+
+    public function payment_scripts() {
+        // we need JavaScript to process a token only on cart/checkout pages, right?
+        if ( ! is_cart() && ! is_checkout() ) {
+            return;
+        }
+
+        // if our payment gateway is disabled, we do not have to enqueue JS too
+        if ( 'no' === $this->enabled ) {
+            return;
+        }
+
+        // and this is our custom JS in your plugin directory that works with token.js
+        wp_register_script( 'woocommerce_payform', plugins_url('assets/js/payform.js', dirname(__FILE__)), array( 'jquery') );
+
+        wp_enqueue_script( 'woocommerce_payform' );
+    }
     ##########################
     ## Helper functions
     ##########################
@@ -1044,14 +1060,14 @@ SCRIPT;
 
         $ret = "
 		<form id=\"silentPost\" action=\"{$url}\" method=\"post\" target=\"{$target}\">
-			{$fields}	
+			{$fields}
+			 <noscript>
+			<input type=\"submit\" value=\"Continue\">
+			 <noscript>
 		</form>
 		<script>
 			window.setTimeout('document.forms.silentPost.submit()', 0);
 		</script>
-        <noscript>
-			<input type=\"submit\" value=\"Continue\">
-		<noscript>
 	";
 
         return $ret;

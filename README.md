@@ -1,38 +1,48 @@
-# README
+PaymentNetwork Woocommerce Plugin
+==============
 
-# Contents
+This module enables the use of http://www.cardstream.com payment gateway using the Woocommerce project http://www.woothemes.com
 
-- Introduction
-- Prerequisites
-- Installing the payment module
-- License
+COMPATIBILITY
+------------
 
-# Introduction
+Compatible with version 5.6 of Woocommerce and upto 4.9.4 of Wordpress. 
 
-This WooCommerce module provides an easy method to integrate with the payment gateway.
- - The woocommerce-latest directory contains the files that need to be uploaded to the wp-content/plugins/ directory
- - Supports WooCommerce versions: **3.2 - 4.7**
- - Supports Recurring payments using WooCommerce subscriptions plugin found here: https://woocommerce.com/products/woocommerce-subscriptions/?utm_source=google&utm_medium=search&utm_campaign=marketplace_search_brand_row&utm_content=+woocommerce_+subscriptions&gclid=CjwKCAiA9bmABhBbEiwASb35V6LBxRec_Gx8zRBjbVNg_iDUE91R4I1wlS0Sd7RjZ--DbOBW_sNIRBoCflkQAvD_BwE#
+INTRODUCTION
+------------
 
-# Prerequisites
+This module enables the woocommerce customers to pay for their items using the PaymentNetwork hosted form or direct payment gateway.
 
-- The module requires the following prerequisites to be met in order to function correctly:
-    - WooCommerce WordPress extension
-    - The 'bcmath' php extension module: https://www.php.net/manual/en/book.bc.php
+What does it do?
+----------------
+Presents the option to pay with credit card or debit card via the PaymentNetwork payment gateway.
 
-> Please note that we can only offer support for the module itself. While every effort has been made to ensure the payment module is complete and bug free, we cannot guarantee normal functionality if unsupported changes are made.
 
-# Installing and configuring the module
+INSTALLATION
+------------
 
-1. Unzip and upload the plugin folder to your /wp-content/plugins/ directory or navigate to Plugins -> add new plugin -> upload plugin and then drop the zip file where specified
+1. Go to the plugins section of the admin panel
+
+2. Click Add New
+
+3. Click Upload plugin (Near the top left of the page nexto the menu)
+
+4. Click the "Choose File" button and select the module (which will be the whole zip file this readme is in)
+
+4. Click the "Install Now" button and then click the "Activate" button.
+
+
+Manual installation 
+--------------------
+
+1. Unzip and upload the plugin folder to your /wp-content/plugins/ directory
+
 2. Activate the plugin through the Plugins menu in WordPress
-3. Go to WooCommerce -> Plugins -> Payment-Network and click on the settings button
-4. Enter your MerchantID / Secretkey and update the customer/country code
-5. If you own a custom form on your gateway, enter the full URL to it in the custom form box (Including trailing /)
-6. Select what type of integration you would like to use
-7. Set the Enabled option to true
-8. Click 'Save Changes'
 
-License
-----
-MIT
+3. Go to WooCommerce -> Settings and click on the Checkout tab. 
+
+4. Find PaymentNetwork in the Payment Gateways section 
+
+5. Click the settings button to configure and enable the gateway.
+
+6. Click 'Save Changes'.

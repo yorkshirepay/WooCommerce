@@ -55,6 +55,7 @@ function init_wc_payment_network() {
     add_filter('plugin_action_links', 'add_wc_payment_network_action_plugin', 10, 5);
 
     include('includes/class-wc-payment-network.php');
+    include('includes/class-wc-credit-card-validator.php');
 
     add_filter('woocommerce_payment_gateways', 'add_payment_network_payment_gateway' );
 
