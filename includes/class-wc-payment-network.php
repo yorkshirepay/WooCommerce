@@ -238,7 +238,6 @@ class WC_Payment_Network extends WC_Payment_Gateway {
      */
     public function capture_order($order_id) {
         $order     = new WC_Order($order_id);
-        // $amount    = (int) round($order->get_total(), 2) * 100;
         $amount    = intval(bcmul(round($order->get_total(), 2), 100, 0));
 
         $billing_address  = $order->get_billing_address_1();
@@ -801,16 +800,16 @@ FORM;
         );
 
         // Sign and send request
-        $req['signature'] = $this->create_signature($req,$this->settings['signature']);
-        $ch = curl_init(self::DEFAULT_DIRECT_URL);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($req));
-        curl_setopt($ch, CURLOPT_HEADER, false);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        parse_str(curl_exec($ch), $res);
-        $info = curl_getinfo($ch);
+        $req['signature'] = $this->create_signature($req, $this->settings['signature']);
 
-        curl_close($ch);
+
+        $options = ['gatewayURL' => self::DEFAULT_DIRECT_URL];
+        if (!empty($this->settings['gatewayURL'])) {
+            // Always append end slash
+            $options['gatewayURL'] = $this->settings['gatewayURL'] . (preg_match('/(\.php|\/)$/', $this->settings['gatewayURL']) == false ? '/direct/': 'direct/');
+        }
+
+        $res = $this->post($req, $options);
 
         // handle response
         if (!empty($res)) {
