@@ -61,7 +61,6 @@ class WC_Payment_Network extends WC_Payment_Gateway {
             }
 
             switch ($this->settings['type']) {
-                case 'direct_v2':
                 case 'direct':
                     $this->gateway_url .= 'direct/';
                     break;
@@ -75,7 +74,6 @@ class WC_Payment_Network extends WC_Payment_Gateway {
             }
         } else {
             switch ($this->settings['type']) {
-                case 'direct_v2':
                 case 'direct':
                     $this->gateway_url = self::DEFAULT_DIRECT_URL;
                     break;
@@ -132,8 +130,7 @@ class WC_Payment_Network extends WC_Payment_Gateway {
                     'hosted'     => 'Hosted',
                     'hosted_v2'  => 'Hosted (Embedded)',
                     'hosted_v3'  => 'Hosted (Modal)',
-                    'direct'     => 'Direct',
-                    'direct_v2'  => 'Direct 3-D Secure V2',
+                    'direct'     => 'Direct 3-D Secure',
                 ),
                 'description' => __('This controls method of integration.', self::$lang),
                 'default'     => 'hosted'
@@ -202,7 +199,7 @@ class WC_Payment_Network extends WC_Payment_Gateway {
             echo wpautop( wp_kses_post( $this->description ) );
         }
 
-        if (in_array($this->settings['type'], ['direct', 'direct_v2'])) {
+        if ($this->settings['type'] === 'direct') {
             echo $this->generate_direct_initial_request_form();
 
             wp_enqueue_style('gateway-credit-card-styles', plugins_url('assets/css/gateway.css', dirname(__FILE__)));
@@ -210,7 +207,7 @@ class WC_Payment_Network extends WC_Payment_Gateway {
     }
 
     public function validate_fields() {
-        if (in_array($this->settings['type'], ['direct', 'direct_v2'])) {
+        if ($this->settings['type'] === 'direct') {
             $result = WC_Credit_Card_Validator::validCreditCard($_POST['cardNumber']);
 
             if (!$result['valid']) {
@@ -335,42 +332,46 @@ class WC_Payment_Network extends WC_Payment_Gateway {
             );
         }
 
-        if ('direct_v2' === $this->settings['type']) {
-            $args = array_merge(
-                $this->capture_order($order_id),
-                $_POST['browserInfo'],
-                [
-                    'type'                 => 1,
-                    'cardNumber'           => str_replace(' ', '', $_POST['cardNumber']),
-                    'cardExpiryMonth'      => $_POST['cardExpiryMonth'],
-                    'cardExpiryYear'       => $_POST['cardExpiryYear'],
-                    'cardCVV'              => $_POST['cardCVV'],
-                    'threeDSVersion'       => 2,
-                    'remoteAddress'        => $_SERVER['REMOTE_ADDR'],
-                    'merchantCategoryCode' => 5411, // TODO: move to settings
-                    'threeDSRedirectURL'   => add_query_arg(
-                        [
-                            'wc-api' => 'wc_'.$this->id.'_direct_callback',
-                        ],
-                        home_url('/')
-                    ),
-                ]
-            );
+        $args = array_merge(
+            $this->capture_order($order_id),
+            $_POST['browserInfo'],
+            [
+                'type'                 => 1,
+                'cardNumber'           => str_replace(' ', '', $_POST['cardNumber']),
+                'cardExpiryMonth'      => $_POST['cardExpiryMonth'],
+                'cardExpiryYear'       => $_POST['cardExpiryYear'],
+                'cardCVV'              => $_POST['cardCVV'],
+                'remoteAddress'        => $_SERVER['REMOTE_ADDR'],
+                'merchantCategoryCode' => 5411, // TODO: move to settings
+                'threeDSRedirectURL'   => add_query_arg(
+                    [
+                        'wc-api' => 'wc_'.$this->id.'_direct_callback',
+                    ],
+                    home_url('/')
+                ),
+            ]
+        );
 
-            if (isset($this->settings['signature']) && !empty($this->settings['signature'])) {
-                $args['signature'] = $this->create_signature($args, $this->settings['signature']);
+        if (isset($this->settings['signature']) && !empty($this->settings['signature'])) {
+            $args['signature'] = $this->create_signature($args, $this->settings['signature']);
+        }
+
+        $response = $this->post($args);
+
+        setcookie('threeDSRef', $response['threeDSRef'], time()+315);
+        setcookie('xref', $response['xref'], time()+315);
+
+        try {
+            if (!$response || !isset($response['responseCode'])) {
+                throw new RuntimeException('Invalid response from Payment Gateway');
             }
 
-            $response = $this->post($args);
+            if ($response['responseCode'] == 65802) {
 
-            setcookie('threeDSRef', $response['threeDSRef'], time()+315);
+                $threeDSVersion = (int) str_replace('.', '', $response['threeDSVersion']);
 
-            try {
-                if (!$response || !isset($response['responseCode'])) {
-                    throw new RuntimeException('Invalid response from Payment Gateway');
-                }
-
-                if ($response['responseCode'] == 65802) {
+                if ($threeDSVersion >= 200) {
+                    // threeds
                     return [
                         'result'   => 'success',
                         'redirect' => add_query_arg(
@@ -383,40 +384,11 @@ class WC_Payment_Network extends WC_Payment_Gateway {
                         ),
                     ];
                 } else {
-                    return $this->process_response($response);
-                }
-            } catch (RuntimeException $exception) {
-                wc_add_notice(  'Connection error.', 'error' );
-                return [];
-            }
-        }
-
-        if ('direct' === $this->settings['type']) {
-            $args = array_merge($this->capture_order($order_id), [
-                'type'              => 1,
-                'cardNumber'        => str_replace(' ', '', $_POST['cardNumber']),
-                'cardExpiryMonth'   => $_POST['cardExpiryMonth'],
-                'cardExpiryYear'    => $_POST['cardExpiryYear'],
-                'cardCVV'           => $_POST['cardCVV'],
-                'threeDSOptions'    => $_POST['threeDSOptions'],
-            ]);
-
-            if (isset($this->settings['signature']) && !empty($this->settings['signature'])) {
-                $args['signature'] = $this->create_signature($args, $this->settings['signature']);
-            }
-
-            $response = $this->post($args);
-
-            try {
-                if (!$response || !isset($response['responseCode'])) {
-                    throw new RuntimeException('Invalid response from Payment Gateway');
-                }
-
-                if ($response['responseCode'] == 65802) {
                     $callback = add_query_arg(
                         [
                             'wc-api' => 'wc_' . $this->gateway . '_direct_callback',
                             'xref' => $response['xref'],
+                            'XDEBUG_SESSION_START' => 'asdf'
                         ],
                         home_url('/')
                     );
@@ -425,21 +397,21 @@ class WC_Payment_Network extends WC_Payment_Gateway {
                         'result'   => 'success',
                         'redirect' =>  add_query_arg(
                             [
-                                'ACSURL' => rawurlencode($response['threeDSACSURL']),
-                                'PaReq' => rawurlencode($response['threeDSPaReq']),
-                                'MD' => rawurlencode($response['threeDSMD']),
+                                'ACSURL' => rawurlencode($response['threeDSURL']),
+                                'PaReq' => rawurlencode($response['threeDSRequest']['PaReq']),
+                                'MD' => rawurlencode($response['threeDSRequest']['MD']),
                                 'TermUrl' => rawurlencode($callback),
                             ],
                             plugins_url('public/3d-secure-form.php', dirname(__FILE__))
                         ),
                     ];
-                } else {
-                    return $this->process_response($response);
                 }
-            } catch (RuntimeException $exception) {
-                wc_add_notice(  'Connection error.', 'error' );
-                return [];
+            } else {
+                return $this->process_response($response);
             }
+        } catch (RuntimeException $exception) {
+            wc_add_notice(  'Connection error.', 'error' );
+            return [];
         }
     }
 
@@ -457,7 +429,6 @@ class WC_Payment_Network extends WC_Payment_Gateway {
                 break;
 //            // we never should arrive here, because we have direct integration implemented via wordpress `payment_fields` functionality
             case 'direct':
-            case 'direct_v2':
             default;
                 return null;
         }
@@ -558,42 +529,22 @@ FORM;
             'cardCVV'            => @$_POST['cardCVV'],
         ];
 
+        $deviceData = [
+            'deviceChannel'				=> 'browser',
+            'deviceIdentity'			=> (isset($_SERVER['HTTP_USER_AGENT']) ? htmlentities($_SERVER['HTTP_USER_AGENT']) : null),
+            'deviceTimeZone'			=> '0',
+            'deviceCapabilities'		=> '',
+            'deviceScreenResolution'	=> '1x1x1',
+            'deviceAcceptContent'		=> (isset($_SERVER['HTTP_ACCEPT']) ? htmlentities($_SERVER['HTTP_ACCEPT']) : null),
+            'deviceAcceptEncoding'		=> (isset($_SERVER['HTTP_ACCEPT_ENCODING']) ? htmlentities($_SERVER['HTTP_ACCEPT_ENCODING']) : null),
+            'deviceAcceptLanguage'		=> (isset($_SERVER['HTTP_ACCEPT_LANGUAGE']) ? htmlentities($_SERVER['HTTP_ACCEPT_LANGUAGE']) : null),
+            'deviceAcceptCharset'		=> (isset($_SERVER['HTTP_ACCEPT_CHARSET']) ? htmlentities($_SERVER['HTTP_ACCEPT_CHARSET']) : null),
+        ];
+
         $browserInfo = '';
-        $scriptData = '';
 
-        if (in_array($this->settings['type'], ['direct_v2'], true)) {
-            $deviceData = [
-                'deviceChannel'				=> 'browser',
-                'deviceIdentity'			=> (isset($_SERVER['HTTP_USER_AGENT']) ? htmlentities($_SERVER['HTTP_USER_AGENT']) : null),
-                'deviceTimeZone'			=> '0',
-                'deviceCapabilities'		=> '',
-                'deviceScreenResolution'	=> '1x1x1',
-                'deviceAcceptContent'		=> (isset($_SERVER['HTTP_ACCEPT']) ? htmlentities($_SERVER['HTTP_ACCEPT']) : null),
-                'deviceAcceptEncoding'		=> (isset($_SERVER['HTTP_ACCEPT_ENCODING']) ? htmlentities($_SERVER['HTTP_ACCEPT_ENCODING']) : null),
-                'deviceAcceptLanguage'		=> (isset($_SERVER['HTTP_ACCEPT_LANGUAGE']) ? htmlentities($_SERVER['HTTP_ACCEPT_LANGUAGE']) : null),
-                'deviceAcceptCharset'		=> (isset($_SERVER['HTTP_ACCEPT_CHARSET']) ? htmlentities($_SERVER['HTTP_ACCEPT_CHARSET']) : null),
-            ];
-
-            foreach ($deviceData as $key => $value) {
-                $browserInfo .= '<input type="hidden" id="'.$key.'" name="browserInfo[' . $key .']" value="' . htmlentities($value) . '" />';
-            }
-
-            $scriptData = <<<SCRIPT
-<script>
-    const screen_width = (window && window.screen ? window.screen.width : '0');
-    const screen_height = (window && window.screen ? window.screen.height : '0');
-    const screen_depth = (window && window.screen ? window.screen.colorDepth : '0');
-    const identity = (window && window.navigator ? window.navigator.userAgent : '');
-    const language = (window && window.navigator ? (window.navigator.language ? window.navigator.language : window.navigator.browserLanguage) : '');
-    const timezone = (new Date()).getTimezoneOffset();
-    const java = (window && window.navigator ? navigator.javaEnabled() : false);
-    document.getElementById('deviceIdentity').value = identity;
-    document.getElementById('deviceTimeZone').value = timezone;
-    document.getElementById('deviceCapabilities').value = 'javascript' + (java ? ',java' : '');
-    document.getElementById('deviceAcceptLanguage').value = language;
-    document.getElementById('deviceScreenResolution').value = screen_width + 'x' + screen_height + 'x' + screen_depth;
-</script>
-SCRIPT;
+        foreach ($deviceData as $key => $value) {
+            $browserInfo .= '<input type="hidden" id="'.$key.'" name="browserInfo[' . $key .']" value="' . htmlentities($value) . '" />';
         }
 
         $generateMonthOptions = function () use ($parameters) {
@@ -642,7 +593,20 @@ SCRIPT;
 </div>
 <br/>
 {$browserInfo}
-{$scriptData}
+<script>
+    var screen_width = (window && window.screen ? window.screen.width : '0');
+    var screen_height = (window && window.screen ? window.screen.height : '0');
+    var screen_depth = (window && window.screen ? window.screen.colorDepth : '0');
+    var identity = (window && window.navigator ? window.navigator.userAgent : '');
+    var language = (window && window.navigator ? (window.navigator.language ? window.navigator.language : window.navigator.browserLanguage) : '');
+    var timezone = (new Date()).getTimezoneOffset();
+    var java = (window && window.navigator ? navigator.javaEnabled() : false);
+    document.getElementById('deviceIdentity').value = identity;
+    document.getElementById('deviceTimeZone').value = timezone;
+    document.getElementById('deviceCapabilities').value = 'javascript' + (java ? ',java' : '');
+    document.getElementById('deviceAcceptLanguage').value = language;
+    document.getElementById('deviceScreenResolution').value = screen_width + 'x' + screen_height + 'x' + screen_depth;
+</script>
 <script type="text/javascript">
 var cardNumber = document.getElementById('field-cardNumber');
 
@@ -745,21 +709,18 @@ FORM;
                 } else {
                     $message = __('Payment error: ', 'woothemes') . $response['responseMessage'];
 
-                    if (method_exists($woocommerce, 'add_error')) {
-                        $woocommerce->add_error($message);
-                    } else {
-                        if (in_array($response['responseCode'], [66315, 66316, 66316, 66320])) {
-                            $message = 'Double check to make sure that you entered your Credit Card number, CVV2 code, and Expiration Date correctly.';
-                        }
-
-                        wc_add_notice($message, $notice_type = 'error');
+                    if (in_array($response['responseCode'], [66315, 66316, 66317, 66320])) {
+                        $message = 'Double check to make sure that you entered your Credit Card number, CVV2 code, and Expiration Date correctly.';
                     }
+
+                    wc_add_notice($message, 'error');
+
                     $order->update_status('failed');
                     $order->add_order_note(__(ucwords($this->gateway) . ' payment failed.' . $orderNotes, self::$lang));
 
                     return [
                         'result' => 'error',
-                        'redirect' => $order->get_cancel_order_url($order),
+                        'redirect' => $this->get_return_url($order)
                     ];
                 }
             }
@@ -853,11 +814,11 @@ FORM;
      */
     public function process_direct_callback() {
         // v1
-        if (isset($_REQUEST['MD'], $_REQUEST['PaRes'], $_REQUEST['xref'])) {
+        if (isset($_REQUEST['MD'], $_REQUEST['PaRes'])) {
             $req = array(
                 'action'	   => 'SALE',
                 'merchantID'   => $this->settings['merchantID'],
-                'xref'         => $_REQUEST['xref'],
+                'xref'         => $_COOKIE['xref'],
                 'threeDSMD'    => $_REQUEST['MD'],
                 'threeDSPaRes' => $_REQUEST['PaRes'],
                 'threeDSPaReq' => (isset($_REQUEST['PaReq']) ? $_REQUEST['PaReq'] : null),
@@ -890,23 +851,15 @@ FORM;
 
                 setcookie('threeDSRef', $response['threeDSRef'], time()+315);
 
-                // Render an IFRAME to show the ACS challenge (hidden for fingerprint method)
-                $style = (isset($response['threeDSRequest']['threeDSMethodData']) ? 'display: none;' : '');
-                echo "<iframe name=\"threeds_acs\" style=\"height:420px; width:420px; {$style}\"></iframe>\n";
-
                 // Silently POST the 3DS request to the ACS in the IFRAME
-                echo $this->silentPost($response['threeDSURL'], $response['threeDSRequest'], 'threeds_acs');
+                echo $this->silentPost($response['threeDSURL'], $response['threeDSRequest']);
 
                 die();
             }
 
             $data = $this->process_response($response);
 
-            echo <<<HTML
-Processing secure form, please wait ...
-<script>window.top.location.href = "{$data['redirect']}";</script>
-HTML;
-            die;
+            $this->redirect($data['redirect']);
         }
     }
 
@@ -959,7 +912,7 @@ HTML;
 
         return [
             'result' => 'error',
-            'redirect' => $order->get_checkout_payment_url(true),
+            'redirect' => $this->get_return_url($order),
         ];
     }
 
@@ -1061,8 +1014,8 @@ SCRIPT;
 		<form id=\"silentPost\" action=\"{$url}\" method=\"post\" target=\"{$target}\">
 			{$fields}
 			 <noscript>
-			<input type=\"submit\" value=\"Continue\">
-			 <noscript>
+			    <input type=\"submit\" value=\"Continue\">
+			 </noscript>
 		</form>
 		<script>
 			window.setTimeout('document.forms.silentPost.submit()', 0);
