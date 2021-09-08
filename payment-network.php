@@ -1,29 +1,7 @@
 <?php
 /*
-Plugin Name: WooCommerce PaymentNetwork
-Plugin URI: http://woothemes.com/woocommerce/
+Plugin Name: PaymentNetwork
 Description: Provides the PaymentNetwork Payment Gateway for WooCommerce
-Version: 1.3
-Author: PaymentNetwork
-Author URI: http://www.Cardstream.com/
-License: GPL2
-*/
-
-/*  Copyright 2019  PaymentNetwork  (support@Cardstream.com)
-
-	This program is free software; you can redistribute it and/or modify
-	it under the terms of the GNU General Public License, version 2, as
-	published by the Free Software Foundation.
-
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details.
-
-	You should have received a copy of the GNU General Public License
-	along with this program; if not, write to the Free Software
-	Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
 */
 
 /**
@@ -55,7 +33,8 @@ function init_wc_payment_network() {
     add_filter('plugin_action_links', 'add_wc_payment_network_action_plugin', 10, 5);
 
     include('includes/class-wc-payment-network.php');
-    include('includes/class-wc-credit-card-validator.php');
+
+    require_once __DIR__.'/vendor/autoload.php';
 
     add_filter('woocommerce_payment_gateways', 'add_payment_network_payment_gateway' );
 
@@ -72,7 +51,11 @@ function add_wc_payment_network_action_plugin($actions, $plugin_file)
 
     if ($plugin == $plugin_file)
     {
-        $actions = array_merge(array('settings' => '<a href="' . admin_url('admin.php?page=wc-settings&tab=checkout&section=PaymentNetwork') . '">' . __('Settings', 'General') . '</a>'), $actions);
+        $configs = include(dirname(__FILE__) . '/config.php');
+
+        $section = str_replace(' ', '', strtolower($configs['gateway_title']));
+
+        $actions = array_merge(array('settings' => '<a href="' . admin_url('admin.php?page=wc-settings&tab=checkout&section='.$section) . '">' . __('Settings', 'General') . '</a>'), $actions);
     }
 
     return $actions;
