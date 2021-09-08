@@ -1,20 +1,3 @@
-
-/*
-  Payform Javascript Library
-
-  URL: https://github.com/jondavidjohn/payform
-  Author: Jonathan D. Johnson <me@jondavidjohn.com>
-  License: MIT
-  Version: 1.4.0
-
-  Changes for use by Cardstream as follows:
-
-  09/11/20 - Samsung input timing bug - Keith Hards <keith.hards@cardstream.com>
-    Add a delay when reading back selectionStart to give the browser time to
-    correctly place the caret. This bug is particular to Samsung who use the
-    androidInputEvent instead of keypress event in their Chrome build.
-*/
-
 (function() {
   var indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
 
