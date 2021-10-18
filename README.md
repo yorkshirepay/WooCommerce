@@ -51,8 +51,9 @@ Manual installation
 Rebrand Instructions
 --------------------
 
-You can rebrand the module by editing the config.php file. This will allow you to set
-the defaults:
+The module does not require any editing of file to be used. The options can be changed via the plugin settings.
+However you can pre set some of the branding options by by editing the config.php file. 
+This will allow you to set the defaults which are :
 
 gateway_title is the title of the module that will appear to the user when selecting the payment method on the checkout.
 method_description is the description that appears in the payment selected on checkout.
