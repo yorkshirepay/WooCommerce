@@ -436,7 +436,7 @@ FORM;
             case is_ajax() && $threeDSVersion < 200:
                 $callback = add_query_arg(
                     [
-                        'wc-api' => 'wc_' . $this->id . '_direct_callback',
+                        'wc-api' => 'wc_'.$this->id,
                         'xref' => $res['xref'],
                     ],
                     home_url('/')
