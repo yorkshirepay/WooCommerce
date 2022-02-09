@@ -516,7 +516,7 @@ FORM;
             $renewal_order->add_order_note(
                 __(ucwords($this->method_title).' payment failed. Could not communicate with direct API. Curl data: ' . json_encode($req), $this->lang)
             );
-            $renewal_order->seve();
+            $renewal_order->save();
         }
 
         if (is_wp_error( $result )) {
