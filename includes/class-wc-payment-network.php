@@ -428,7 +428,7 @@ FORM;
                         [
                             'ACSURL' => rawurlencode($res['threeDSURL']),
                             'threeDSRef' => rawurlencode($res['threeDSRef']),
-                            'threeDSMethodData' => rawurlencode($res['threeDSRequest']['threeDSMethodData']),
+                            'threeDSRequest' => $res['threeDSRequest'],
                         ],
                         plugins_url('public/3d-secure-form-v2.php', dirname(__FILE__))
                     ),
@@ -557,7 +557,7 @@ FORM;
             $response = $this->gateway->directRequest($req);
         }
 
-        $res = empty($response) ? $_POST: $response;
+        $res = empty($response) ? stripslashes_deep($_POST) : $response;
 
         $this->create_wallet($res);
 
