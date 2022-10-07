@@ -3,12 +3,17 @@ Disclaimer: Please note that we no longer support older versions of SDKs and Mod
 PaymentNetwork Woocommerce Plugin
 ==============
 
-This module enables the use of http://www.cardstream.com payment gateway using the Woocommerce project http://www.woothemes.com
+This module enables the use of https://gateway.example.com payment gateway using the Woocommerce project http://www.woothemes.com.
 
 COMPATIBILITY
 ------------
 
 Compatible with version 6.x of Woocommerce and upto 6.x of Wordpress. 
+
+REQUIREMENTS
+------------
+
+PHP-BCMaths
 
 INTRODUCTION
 ------------
