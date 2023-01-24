@@ -1,7 +1,9 @@
 <?php
 /*
-Plugin Name: PaymentNetwork
-Description: Provides the PaymentNetwork Payment Gateway for WooCommerce
+Plugin Name: YorkshirePay Gateway
+Description: Provides the YorkshirePay Payment Gateway for WooCommerce
+Author: Yorkshire Payments
+Author URI: http://yorkshirepayments.com
 */
 
 /**
